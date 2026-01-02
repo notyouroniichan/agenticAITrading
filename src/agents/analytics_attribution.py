@@ -18,8 +18,6 @@ class AttributionAgent:
             
         total_pnl_change = current.total_unrealized_pnl_usd - previous.total_unrealized_pnl_usd
         
-        # Breakdown by asset
-        # Need to align positions by symbol
         curr_pos_map = {p.symbol: p for p in current.positions}
         prev_pos_map = {p.symbol: p for p in previous.positions}
         

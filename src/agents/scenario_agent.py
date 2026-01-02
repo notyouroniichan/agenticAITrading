@@ -25,15 +25,10 @@ class ScenarioAgent:
         simulated_equity = snapshot.total_equity_usd
         pnl_impact = 0.0
         
-        # We need to simulate the change in unrealized PnL for each position
-        # New PnL = (New Price - Entry Price) * Size (for Long)
-        # New Price = Mark Price * (1 + shock)
         
         simulated_positions = []
 
         for pos in snapshot.positions:
-            # Check if this asset has a shock defined
-            # Simplified matching: check if shock key is in symbol string (e.g., "BTC" in "BTC/USDT")
             shock_pct = 0.0
             for asset, shock in shocks.items():
                 if asset in pos.symbol:
@@ -46,9 +41,6 @@ class ScenarioAgent:
             original_mark = pos.mark_price
             new_mark = original_mark * (1 + shock_pct)
             
-            # PnL Calculation
-            # Long: (New - Entry) * Size
-            # Short: (Entry - New) * Size
             
             if pos.side.lower() == 'long':
                 new_pnl = (new_mark - pos.entry_price) * pos.size

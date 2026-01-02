@@ -26,11 +26,9 @@ class SystemOrchestrator:
         self.running = True
         logger.info("Initializing Orchestrator...")
         
-        # 1. Start Market Data Stream
         asyncio.create_task(self.market_agent.start())
         await self.portfolio_agent.init_db()
         
-        # 2. Main Loop
         while self.running:
             try:
                 await self.run_cycle()
@@ -42,17 +40,13 @@ class SystemOrchestrator:
     async def run_cycle(self):
         logger.info("--- Starting Analytics Cycle ---")
         
-        # 1. Fetch Portfolio State
         snapshot = await self.portfolio_agent.fetch_snapshot()
         
-        # 2. Compute Analytics
         exp_metrics = self.exposure_agent.compute_metrics(snapshot)
         
-        # Fetch equity curve (mock for now, should query DB)
         equity_curve = [100000.0, snapshot.total_equity_usd] 
         risk_metrics = self.risk_agent.compute_metrics(snapshot, equity_curve)
         
-        # 3. Create Analytics Snapshot Model
         analytics_snap = AnalyticsSnapshot(
             snapshot_id=snapshot.id,
             gross_exposure_usd=exp_metrics['gross_exposure_usd'],
@@ -62,17 +56,9 @@ class SystemOrchestrator:
             var_95_1d_pct=risk_metrics['var_95_1d_pct']
         )
         
-        # Persist (TODO: add to session)
-        # async with self.portfolio_agent.async_session() as session:
-        #    session.add(analytics_snap)
-        #    await session.commit()
         
         logger.info(f"Cycle Complete. Equity=${snapshot.total_equity_usd:.2f}, VaR={risk_metrics['var_95_1d_pct']:.2%}")
         
-        # 4. Trigger Agents (Optional)
-        # if risk_metrics['rolling_drawdown_pct'] > 0.05:
-        #    alert = await self.llm_agent.generate_briefing(snapshot, analytics_snap, risk_metrics)
-        #    logger.info(f"RISK ALERT: {alert}")
 
     async def stop(self):
         self.running = False

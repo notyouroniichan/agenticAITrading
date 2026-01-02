@@ -26,7 +26,6 @@ class LLMAnalystAgent:
         if not self.client:
              return "LLM Analyst: No API Key provided or client not initialized."
 
-        # Prepare context
         context = {
             "total_equity": portfolio.total_equity_usd,
             "unrealized_pnl": portfolio.total_unrealized_pnl_usd,

@@ -27,24 +27,14 @@ class PortfolioStateAgent:
         timestamp = datetime.now()
         
         # 1. Fetch from exchanges (Parallel)
-        # Using mocks if no keys provided for safety/dev
-        if not settings.BINANCE_API_KEY:
-            logger.warning("No Binance keys found, using mock data")
-            binance_positions = self._mock_binance_positions()
-        else:
-            binance_positions = await self._fetch_binance_positions()
-            
-        # 1a. Fetch Hyperliquid
+        binance_positions = await self._fetch_binance_positions()
         hyper_positions = await self._fetch_hyperliquid_positions() 
-        
-        # 1b. Fetch OKX & Delta
         okx_positions = await self._fetch_okx_positions()
         delta_positions = await self._fetch_delta_positions()
         
         all_positions = binance_positions + hyper_positions + okx_positions + delta_positions
         
-        # 2. Aggregate
-        total_equity = 0.0 # simplified for MVP, usually need balance fetch too
+        total_equity = 0.0 
         total_margin = 0.0
         total_upnl = 0.0
         
@@ -55,7 +45,6 @@ class PortfolioStateAgent:
             total_margin += (pos.size * pos.entry_price) / pos.leverage if pos.leverage else 0
             total_upnl += pos.unrealized_pnl
             
-            # Asset breakdown
             base_asset = pos.symbol.split('/')[0] if '/' in pos.symbol else pos.symbol
             if base_asset not in asset_breakdown:
                 asset_breakdown[base_asset] = {"net_exposure": 0.0}
@@ -73,16 +62,17 @@ class PortfolioStateAgent:
                 leverage=pos.leverage
             ))
 
+        total_equity = total_margin + total_upnl 
+
         snapshot = PortfolioSnapshot(
             timestamp=timestamp,
-            total_equity_usd=100_000 + total_upnl, # Mock assuming 100k starting cash
+            total_equity_usd=total_equity,
             total_margin_used_usd=total_margin,
             total_unrealized_pnl_usd=total_upnl,
             asset_breakdown=asset_breakdown,
             positions=position_snapshots
         )
         
-        # 3. Persist
         await self._persist_snapshot(snapshot)
         return snapshot
 
@@ -92,37 +82,13 @@ class PortfolioStateAgent:
             await session.commit()
             logger.info(f"Persisted snapshot ID: {snapshot.id} with {len(snapshot.positions)} positions")
 
-    def _mock_binance_positions(self) -> List[NormalizedPosition]:
-        return [
-            NormalizedPosition(
-                venue="binance",
-                symbol="BTC/USDT",
-                side="long",
-                size=0.5,
-                entry_price=95000.0,
-                mark_price=96000.0,
-                unrealized_pnl=500.0, # (96000-95000)*0.5
-                leverage=10.0
-            )    
-        ]
-        
-    def _mock_hyperliquid_positions(self) -> List[NormalizedPosition]:
-        return [
-             NormalizedPosition(
-                venue="hyperliquid",
-                symbol="ETH-USD",
-                side="short",
-                size=10.0,
-                entry_price=3000.0,
-                mark_price=2950.0,
-                unrealized_pnl=500.0, 
-                leverage=5.0
-            )   
-        ]
 
     async def _fetch_binance_positions(self) -> List[NormalizedPosition]:
         """Fetch positions from Binance Futures."""
         positions = []
+        if not (settings.BINANCE_API_KEY and settings.BINANCE_API_SECRET):
+            return []
+            
         try:
             exchange = ccxt.binance({
                 'apiKey': settings.BINANCE_API_KEY,
@@ -130,12 +96,8 @@ class PortfolioStateAgent:
                 'options': {'defaultType': 'future'}
             })
             
-            # Fetch balance for equity check (optional/TODO)
-            # balance = await exchange.fetch_balance()
             
-            # Fetch positions
             raw_positions = await exchange.fetch_positions()
-            # Filter for active positions
             active_positions = [p for p in raw_positions if float(p['contracts']) > 0]
             
             for p in active_positions:
@@ -183,7 +145,6 @@ class PortfolioStateAgent:
                 size = float(p['contracts']) if p.get('contracts') else float(p['amount'])
                 if size == 0: continue
                 
-                # OKX usually returns explicit side
                 item_side = p['side'] 
                 side = item_side if item_side else ('long' if size > 0 else 'short')
                 
@@ -272,7 +233,6 @@ class PortfolioStateAgent:
                         for item in asset_positions:
                             pos = item.get("position", {})
                             coin = pos.get("coin", "UNKNOWN")
-                            # API returns 'szi' for position size (signed)
                             sze = float(pos.get("szi", 0))
                             
                             if sze == 0:

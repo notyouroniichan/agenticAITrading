@@ -21,7 +21,6 @@ class MarketDataAgent:
         self.running = True
         logger.info("Starting Market Data Agent...")
         
-        # Add exchange connectors here
         self.tasks.append(asyncio.create_task(self._connect_binance(["btcusdt", "ethusdt"])))
         self.tasks.append(asyncio.create_task(self._connect_hyperliquid()))
         
@@ -67,7 +66,6 @@ class MarketDataAgent:
                         msg = await ws.recv()
                         data = json.loads(msg)
                         
-                        # Normalize
                         ticker = MarketTicker(
                             venue="binance",
                             symbol=data['s'], # Symbol e.g. BTCUSDT
@@ -94,7 +92,6 @@ class MarketDataAgent:
                 async with websockets.connect(url) as ws:
                     logger.info("Connected to Hyperliquid WS")
                     
-                    # Subscribe to all mids (tickers)
                     sub_msg = {
                         "method": "subscribe",
                         "subscription": {"type": "allMids"}
@@ -110,8 +107,6 @@ class MarketDataAgent:
                             ts = datetime.now() # Hyperliquid allMids doesn't send TS per tick, use local
                             
                             for symbol, price in mids.items():
-                                # Hyperliquid mids only gives mid price, not full depth here.
-                                # Approximating last/bid/ask as mid for this snapshot feed
                                 price_f = float(price)
                                 ticker = MarketTicker(
                                     venue="hyperliquid",

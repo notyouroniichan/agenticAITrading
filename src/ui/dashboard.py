@@ -4,14 +4,12 @@ import requests
 import plotly.express as px
 from datetime import datetime
 
-# Configure page
 st.set_page_config(
     page_title="Agentic AI Portfolio",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# API Config
 API_URL = "http://localhost:8000"
 
 def fetch_data():
@@ -34,7 +32,6 @@ def simulate_shock(shocks):
 
 st.title("Agentic Portfolio Intelligence")
 
-# Main Data Fetch
 data = fetch_data()
 
 if not data:
@@ -45,12 +42,10 @@ portfolio = data.get("portfolio", {})
 analytics = data.get("analytics", {})
 positions = portfolio.get("positions", [])
 
-# --- Sidebar ---
 st.sidebar.header("Control Panel")
 st.sidebar.success("System Status: Online")
 st.sidebar.info(f"Last Update: {portfolio.get('timestamp')}")
 
-# --- Top Key Metrics ---
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("Total Equity", f"${portfolio.get('total_equity_usd', 0):,.2f}")
@@ -64,11 +59,9 @@ with col4:
     hhi = analytics.get('exposure', {}).get('concentration_hhi', 0)
     st.metric("Concentration (HHI)", f"{hhi:.2f}")
 
-# --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["Portfolio Overview", "Scenario Lab", "Risk Intelligence"])
 
 with tab1:
-    # Asset Allocation
     st.subheader("Asset Allocation")
     if positions:
         df_pos = pd.DataFrame(positions)
@@ -104,7 +97,6 @@ with tab2:
             res_col1.metric("Simulated Equity", f"${sim_res.get('simulated_equity', 0):,.2f}",
                             delta=f"{sim_res.get('pnl_impact', 0):,.2f}")
             
-            # Show details table
             st.write("Impact Details:")
             st.dataframe(pd.DataFrame(sim_res.get('details', [])))
 
@@ -118,5 +110,4 @@ with tab3:
     **Value at Risk (1D 95%)**: {risk_data.get('var_95_1d_pct', 0):.2%}
     """)
     
-    # Placeholder for chart
     st.info("Historical risk charts require database history populate.")

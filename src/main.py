@@ -10,7 +10,6 @@ async def main():
     logger.info("Starting Agentic Portfolio Analytics System...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     
-    # Placeholder for agent initialization
     
     try:
         while True:

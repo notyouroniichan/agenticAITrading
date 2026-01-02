@@ -11,6 +11,5 @@ def setup_logging():
         ]
     )
 
-# Create a default logger instance for easy import
 setup_logging()
 logger = logging.getLogger("AgenticAI")

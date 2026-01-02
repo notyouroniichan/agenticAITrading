@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import pandas as pd
 import duckdb
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
@@ -16,8 +17,6 @@ class RiskAgent:
         equity_curve: List of historical total_equity_usd values (chronological).
         """
         
-        # 1. Rolling Drawdown
-        # DD = (Peak - Current) / Peak
         if not equity_curve:
             current_drawdown = 0.0
         else:
@@ -28,10 +27,6 @@ class RiskAgent:
             else:
                 current_drawdown = 0.0
                 
-        # 2. Parametric VaR (95% 1-day)
-        # Simplified: Sum of individual position VaRs (no correlation matrix for MVP)
-        # VaR_pos = Notional * Volatility * Z_score (1.645 for 95%)
-        # Volatility: fetch trailing 30d vol from DuckDB
         
         total_var = 0.0
         z_score = 1.645
@@ -42,7 +37,6 @@ class RiskAgent:
             pos_var = notional * vol * z_score
             total_var += pos_var
             
-        # VaR as % of Equity
         var_pct = 0.0
         if snapshot.total_equity_usd > 0:
             var_pct = total_var / snapshot.total_equity_usd
@@ -57,9 +51,45 @@ class RiskAgent:
     def _get_asset_volatility(self, symbol: str) -> float:
         """
         Fetch annualized volatility for symbol from DuckDB.
-        MVP: Return hardcoded/mock vol if no data.
+        Returns 0.0 if insufficient data.
         """
-        # TODO: Implement actual SQL query on market_ticks
-        # SELECT stddev(returns) ...
-        # For MVP, returning generic crypto vol ~3% daily
-        return 0.03 
+        try:
+            search_sym = symbol.replace("/", "").replace("-USD", "").replace("-", "")
+            
+            # Fetch last 24h of 'last' price
+            q = f"""
+                SELECT last, timestamp 
+                FROM market_ticks 
+                WHERE symbol ILIKE '%{search_sym}%'
+                AND timestamp > now() - INTERVAL '1 day'
+                ORDER BY timestamp ASC
+            """
+            
+            # Use fetchdf to get pandas dataframe
+            df = self.duck_conn.execute(q).fetchdf()
+            
+            if len(df) < 10:
+                print(f"Warning: Insufficient vol data for {symbol} (found {len(df)} ticks)")
+                return 0.0
+                
+            # Calculate simple realized volatility from tick returns (approximation)
+            # Ideally resample to hourly
+            df.set_index('timestamp', inplace=True)
+            # Resample to hourly close to standardize
+            hourly = df['last'].resample('h').last().dropna()
+            
+            if len(hourly) < 2:
+                return 0.0
+            
+            returns = hourly.pct_change().dropna()
+            vol = returns.std() * np.sqrt(24 * 365) # Annualized
+            
+            if np.isnan(vol):
+                return 0.0
+                
+            logger.info(f"Computed Volatility for {symbol}: {vol:.2%}")
+            return vol
+            
+        except Exception as e:
+            logger.error(f"Error calculating vol for {symbol}: {e}")
+            return 0.0 

@@ -22,12 +22,9 @@ class ExposureAgent:
 
         total_equity = snapshot.total_equity_usd
         
-        # 1. Gross & Net Exposure
         gross_exposure = 0.0
         net_exposure = 0.0
         
-        # For HHI, we need weights of individual assets (grouped by symbol/base asset)
-        # We'll use absolute notional value for weight calculation
         asset_weights = {}
         total_notional = 0.0
         
@@ -40,15 +37,10 @@ class ExposureAgent:
             else:
                 net_exposure -= notional
                 
-            # Group by symbol for HHI (simplified, better to group by base asset)
-            # Assuming symbol is unique asset for now or closely related
             sym = pos.symbol
             asset_weights[sym] = asset_weights.get(sym, 0.0) + notional
             total_notional += notional
             
-        # 2. HHI Calculation
-        # HHI = Sum of squared weights (s_i^2) where s_i is market share (0 to 1 or 0 to 100)
-        # We will use 0 to 1 scale.
         hhi = 0.0
         if total_notional > 0:
             for val in asset_weights.values():
